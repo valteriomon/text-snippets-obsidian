@@ -54,23 +54,32 @@ class TextSnippets extends obsidian.Plugin {
                         key: "tab"
                     }],
             });
-            this.cmEditors = [];
-            this.registerCodeMirror((cm) => {
-                this.cmEditors.push(cm);
-                // the callback has to be called through another function in order for 'this' to work
-                cm.on('keydown', (cm, event) => this.handleKeyDown(cm, event));
-            });
+            if (isLegacy) {
+                this.cmEditors = [];
+                this.registerCodeMirror((cm) => {
+                    this.cmEditors.push(cm);
+                    // the callback has to be called through another function in order for 'this' to work
+                    cm.on('keydown', (cm, event) => this.handleKeyDown(event));
+                });
+            }
+            else {
+                this.app.workspace.onLayoutReady(() => {
+                    this.registerDomEvent(document, 'keydown', (event) => this.handleKeyDown(event));
+                });
+            }
         });
     }
     onunload() {
         return __awaiter(this, void 0, void 0, function* () {
             console.log("Unloading text snippet plugin");
-            this.cmEditors = [];
-            this.registerCodeMirror((cm) => {
-                this.cmEditors.push(cm);
-                // the callback has to be called through another function in order for 'this' to work
-                cm.off('keydown', (cm, event) => this.handleKeyDown(cm, event));
-            });
+            if (!this.settings.isWYSIWYG) {
+                this.cmEditors = [];
+                this.registerCodeMirror((cm) => {
+                    this.cmEditors.push(cm);
+                    // the callback has to be called through another function in order for 'this' to work
+                    cm.off('keydown', (cm, event) => this.handleKeyDown(event));
+                });
+            }
         });
     }
     loadSettings() {
@@ -114,8 +123,8 @@ class TextSnippets extends obsidian.Plugin {
         var start = pos.ch, end = start, line = cm.getLine(pos.line);
         while (start && this.isWord(line.charAt(start - 1)))
             --start;
-        while (end < line.length && this.isWord(line.charAt(end)))
-            ++end;
+        // while (end < line.length && this.isWord(line.charAt(end)))
+            // ++end;
         var fr = { line: pos.line, ch: start };
         var t = { line: pos.line, ch: end };
         return { from: fr, to: t, word: line.slice(start, end) };
@@ -256,7 +265,10 @@ class TextSnippets extends obsidian.Plugin {
             ch: cursor.ch + cursorOffset
         });
     }
-    handleKeyDown(cm, event) {
+    handleKeyDown(event) {
+        if (this.app.workspace.getActiveViewOfType(obsidian.MarkdownView) == null) {
+            return;
+        }
         if ((event.key == 'Tab' && this.settings.useTab) || (event.code == 'Space' && this.settings.useSpace)) {
             this.SnippetOnTrigger(event.code, true);
         }
